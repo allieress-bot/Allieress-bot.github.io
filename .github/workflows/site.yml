@@ -29,8 +29,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           mkdir -p site
-          python -c "from google import genai; from pathlib import Path; import html; c=genai.Client(); r=c.models.generate_content(model='gemini-2.5-flash', contents='Write a short homepage intro and 3 bullet ideas for a website about budget-friendly remote work tools. Keep it practical and beginner-friendly.'); t=html.escape(r.text); Path('site/index.html').write_text('<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Remote Work Tool Guide</title></head><body><h1>Remote Work Tool Guide</h1><pre style=\"white-space:pre-wrap;font:inherit\">'+t+'</pre></body></html>', encoding='utf-8')"
-
+          python -c "from google import genai; from pathlib import Path; import html, datetime; c=genai.Client(); r=c.models.generate_content(model='gemini-2.5-flash', contents='Write a helpful beginner guide about a specific budget home office setup. Include a title and practical tips.'); t=r.text; now=datetime.datetime.utcnow().strftime('%Y-%m-%d'); Path('site/article.html').write_text('<h1>Latest Guide</h1><pre>'+html.escape(t)+'</pre>'); Path('site/index.html').write_text('<!doctype html><html><body><h1>Remote Work Tool Guide</h1><p><a href=\"article.html\">Read latest guide</a></p></body></html>')"
       - uses: actions/upload-pages-artifact@v4
         with:
           path: ./site
