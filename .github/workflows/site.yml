@@ -28,28 +28,90 @@ jobs:
       - name: Install dependencies
         run: pip install -q -U google-genai
 
-      - name: Generate site
+      - name: Generate site with Gemini
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          SITE_NAME: "Remote Work Tool Guide"
+          NICHE: "budget-friendly productivity and home office tools for remote workers"
         run: |
           mkdir -p site
           python <<'PY'
+          import os
+          import html
+          from google import genai
           from pathlib import Path
 
-          html = """<!doctype html>
+          site_name = os.environ["SITE_NAME"]
+          niche = os.environ["NICHE"]
+
+          client = genai.Client()
+
+          prompt = f"""
+          Write a short homepage for a niche website.
+
+          Site name: {site_name}
+          Niche: {niche}
+
+          Return plain text in exactly this format:
+
+          TITLE: <title>
+          INTRO: <2 sentence intro>
+          BULLETS:
+          - <bullet 1>
+          - <bullet 2>
+          - <bullet 3>
+          """
+
+          response = client.models.generate_content(
+              model="gemini-3-flash-preview",
+              contents=prompt,
+          )
+
+          text = response.text.strip().splitlines()
+
+          title = site_name
+          intro = "Practical recommendations for remote workers."
+          bullets = []
+
+          mode = None
+          for line in text:
+              if line.startswith("TITLE:"):
+                  title = line.replace("TITLE:", "", 1).strip() or site_name
+              elif line.startswith("INTRO:"):
+                  intro = line.replace("INTRO:", "", 1).strip() or intro
+              elif line.startswith("BULLETS:"):
+                  mode = "bullets"
+              elif mode == "bullets" and line.strip().startswith("- "):
+                  bullets.append(line.strip()[2:])
+
+          if len(bullets) < 3:
+              bullets = [
+                  "Budget-friendly home office picks",
+                  "Simple productivity setup tips",
+                  "Beginner-friendly buying guides",
+              ]
+
+          bullets_html = "".join(f"<li>{html.escape(item)}</li>" for item in bullets[:3])
+
+          page = f"""<!doctype html>
           <html lang="en">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Remote Work Tool Guide</title>
+            <title>{html.escape(title)}</title>
+            <meta name="description" content="{html.escape(intro)}">
           </head>
           <body>
-            <h1>Remote Work Tool Guide</h1>
-            <p>Test deployment is working.</p>
+            <h1>{html.escape(title)}</h1>
+            <p>{html.escape(intro)}</p>
+            <h2>What you'll find here</h2>
+            <ul>
+              {bullets_html}
+            </ul>
           </body>
           </html>"""
 
-          Path("site/index.html").write_text(html, encoding="utf-8")
+          Path("site/index.html").write_text(page, encoding="utf-8")
           PY
 
       - name: Upload Pages artifact
