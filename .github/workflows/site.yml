@@ -15,22 +15,141 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/configure-pages@v5
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
 
-      - uses: actions/setup-python@v5
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - run: pip install google-genai
+      - name: Install dependency
+        run: pip install google-genai
 
       - name: Generate site
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           mkdir -p site
-          python -c "from google import genai; from pathlib import Path; import html, datetime, re; c=genai.Client(); r=c.models.generate_content(model='gemini-2.5-flash', contents='Write a helpful beginner guide about a specific budget home office setup. Start with a short clear title on the first line, then provide practical tips in plain text.'); text=r.text.strip(); lines=[line.strip() for line in text.splitlines() if line.strip()]; title=(lines[0] if lines else 'Budget Home Office Setup Guide')[:80]; slug=re.sub(r'[^a-z0-9]+','-',title.lower()).strip('-')[:50] or 'guide'; date=datetime.datetime.utcnow().strftime('%Y-%m-%d'); fname=f'{date}-{slug}.html'; Path('site').mkdir(exist_ok=True); Path(f'site/{fname}').write_text('<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>'+html.escape(title)+'</title><meta name=\"description\" content=\"AI-generated guide about budget-friendly remote work setups.\"></head><body><p><a href=\"index.html\">Home</a></p><h1>'+html.escape(title)+'</h1><pre style=\"white-space:pre-wrap;font:inherit\">'+html.escape(text)+'</pre></body></html>', encoding='utf-8'); files=sorted([f.name for f in Path('site').glob('*.html') if f.name not in ['index.html','about.html']], reverse=True); links=''.join([f'<li><a href=\"{f}\">{html.escape(f[:-5].replace(\"-\",\" \").title())}</a></li>' for f in files[:50]]); Path('site/index.html').write_text('<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Remote Work Tool Guide</title><meta name=\"description\" content=\"AI-generated guides about budget-friendly remote work tools and setups.\"></head><body><h1>Remote Work Tool Guide</h1><p>AI-generated guides about budget-friendly remote work tools and setups.</p><p><a href=\"about.html\">About</a></p><ul>'+links+'</ul></body></html>', encoding='utf-8'); Path('site/about.html').write_text('<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>About</title></head><body><p><a href=\"index.html\">Home</a></p><h1>About</h1><p>This site publishes AI-generated guides focused on affordable remote work tools and home office setups.</p><p>Content may be imperfect or outdated.</p></body></html>', encoding='utf-8'); base='https://allieress-bot.github.io'; urls=['index.html','about.html']+files; sitemap=''.join([f'<url><loc>{base}/{u}</loc></url>' for u in urls]); Path('site/sitemap.xml').write_text('<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n'+sitemap+'\n</urlset>', encoding='utf-8'); Path('site/robots.txt').write_text('User-agent: *\nAllow: /\nSitemap: https://allieress-bot.github.io/sitemap.xml\n', encoding='utf-8')"
+          python <<'PY'
+          from google import genai
+          from pathlib import Path
+          import html
+          import datetime
+          import re
+
+          client = genai.Client()
+
+          response = client.models.generate_content(
+              model="gemini-2.5-flash",
+              contents=(
+                  "Write a helpful beginner guide about a specific budget home office setup. "
+                  "Put a short clear title on the first line, then practical plain-text advice."
+              ),
+          )
+
+          text = response.text.strip()
+          lines = [line.strip() for line in text.splitlines() if line.strip()]
+          title = (lines[0] if lines else "Budget Home Office Setup Guide")[:80]
+
+          slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:50]
+          if not slug:
+              slug = "guide"
+
+          date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+          fname = f"{date}-{slug}.html"
+
+          site = Path("site")
+          site.mkdir(exist_ok=True)
+
+          article_html = f"""<!doctype html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>{html.escape(title)}</title>
+            <meta name="description" content="AI-generated guide about budget-friendly remote work setups.">
+          </head>
+          <body>
+            <p><a href="index.html">Home</a></p>
+            <h1>{html.escape(title)}</h1>
+            <pre style="white-space: pre-wrap; font: inherit;">{html.escape(text)}</pre>
+          </body>
+          </html>
+          """
+          (site / fname).write_text(article_html, encoding="utf-8")
+
+          files = sorted(
+              [
+                  f.name
+                  for f in site.glob("*.html")
+                  if f.name not in ["index.html", "about.html"]
+              ],
+              reverse=True,
+          )
+
+          links = "".join(
+              f'<li><a href="{name}">{html.escape(name[:-5].replace("-", " ").title())}</a></li>'
+              for name in files[:50]
+          )
+
+          index_html = f"""<!doctype html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>Remote Work Tool Guide</title>
+            <meta name="description" content="AI-generated guides about budget-friendly remote work tools and setups.">
+          </head>
+          <body>
+            <h1>Remote Work Tool Guide</h1>
+            <p>AI-generated guides about budget-friendly remote work tools and setups.</p>
+            <p><a href="about.html">About</a></p>
+            <ul>{links}</ul>
+          </body>
+          </html>
+          """
+          (site / "index.html").write_text(index_html, encoding="utf-8")
+
+          about_html = """<!doctype html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>About</title>
+          </head>
+          <body>
+            <p><a href="index.html">Home</a></p>
+            <h1>About</h1>
+            <p>This site publishes AI-generated guides focused on affordable remote work tools and home office setups.</p>
+            <p>Content may be imperfect or outdated.</p>
+          </body>
+          </html>
+          """
+          (site / "about.html").write_text(about_html, encoding="utf-8")
+
+          base = "https://allieress-bot.github.io"
+          urls = ["index.html", "about.html"] + files
+
+          sitemap_entries = "\n".join(
+              f"  <url><loc>{base}/{u}</loc></url>" for u in urls
+          )
+          sitemap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+          <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          {sitemap_entries}
+          </urlset>
+          """
+          (site / "sitemap.xml").write_text(sitemap_xml, encoding="utf-8")
+
+          robots_txt = f"""User-agent: *
+          Allow: /
+          Sitemap: {base}/sitemap.xml
+          """
+          (site / "robots.txt").write_text(robots_txt, encoding="utf-8")
+          PY
 
       - name: Save generated pages to repo
         run: |
@@ -40,20 +159,16 @@ jobs:
           git diff --cached --quiet || git commit -m "Update generated site content"
           git push
 
-      - uses: actions/upload-pages-artifact@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v4
         with:
-          Path('site/sitemap.xml').write_text(
-    '<?xml version="1.0" encoding="UTF-8"?>\n'
-    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
-    '\n'.join([f'<url><loc>{base}/{u}</loc></url>' for u in urls]) +
-    '\n</urlset>',
-    encoding='utf-8'
-)
+          path: ./site
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
 
     steps:
-      - id: deployment
+      - name: Deploy to Pages
+        id: deployment
         uses: actions/deploy-pages@v4
