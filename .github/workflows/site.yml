@@ -1,5 +1,5 @@
 name: Build and deploy autonomous site
- 
+
 on:
   workflow_dispatch:
   push:
@@ -38,117 +38,115 @@ jobs:
         run: |
           mkdir -p site/posts
           python <<'PY'
-          import os
-          import re
-          import html
-          from pathlib import Path
-          from datetime import datetime, timezone
-          from google import genai
+import os
+import re
+import html
+from pathlib import Path
+from datetime import datetime, timezone
+from google import genai
 
-          site_name = os.environ["SITE_NAME"]
-          niche = os.environ["NICHE"]
+site_name = os.environ["SITE_NAME"]
+niche = os.environ["NICHE"]
 
-          now = datetime.now(timezone.utc)
-          date_str = now.strftime("%Y-%m-%d")
-          slug = f"{date_str}-" + re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60]
+now = datetime.now(timezone.utc)
+date_str = now.strftime("%Y-%m-%d")
 
-          client = genai.Client()
+client = genai.Client()
 
-                    prompt = f"""
-          You write practical content for a niche site.
+prompt = f"""
+You write practical content for a niche site.
 
-          Niche: {niche}
+Niche: {niche}
 
-          Return plain text in exactly this format:
+Return plain text in exactly this format:
 
-          TITLE: <specific SEO-friendly title>
-          DESCRIPTION: <1 sentence meta description>
-          ARTICLE:
-          <HTML using only h2, h3, p, ul, ol, li, strong, em>
+TITLE: <specific SEO-friendly title>
+DESCRIPTION: <1 sentence meta description>
+ARTICLE:
+<HTML using only h2, h3, p, ul, ol, li, strong, em>
 
-          Requirements:
-          - 700 to 1100 words
-          - beginner-friendly
-          - practical, specific, non-hype
-          - no fake testing, no invented prices, no personal experience
-          - include one section titled "Best for tight budgets"
-          - include one section titled "What to avoid"
-          - choose a very specific long-tail topic within the niche
-          - do not repeat the same angle as a generic homepage
-          """
+Requirements:
+- 700 to 1100 words
+- beginner-friendly
+- practical, specific, non-hype
+- no fake testing, no invented prices, no personal experience
+- include one section titled "Best for tight budgets"
+- include one section titled "What to avoid"
+- choose a very specific long-tail topic within the niche
+"""
 
-          response = client.models.generate_content(
-              model="gemini-2.5-flash",
-              contents=prompt,
-          )
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=prompt,
+)
 
-          text = response.text.strip()
+text = response.text.strip()
 
-          title_match = re.search(r"TITLE:\s*(.+)", text)
-          desc_match = re.search(r"DESCRIPTION:\s*(.+)", text)
-          article_match = re.search(r"ARTICLE:\s*(.*)", text, re.S)
+title_match = re.search(r"TITLE:\s*(.+)", text)
+desc_match = re.search(r"DESCRIPTION:\s*(.+)", text)
+article_match = re.search(r"ARTICLE:\s*(.*)", text, re.S)
 
-          title = title_match.group(1).strip() if title_match else "Daily Remote Work Guide"
-          description = desc_match.group(1).strip() if desc_match else "Practical buying advice for remote workers."
-          article_html = article_match.group(1).strip() if article_match else "<p>Article generation failed.</p>"
+title = title_match.group(1).strip() if title_match else "Daily Remote Work Guide"
+description = desc_match.group(1).strip() if desc_match else "Practical buying advice for remote workers."
+article_html = article_match.group(1).strip() if article_match else "<p>Article generation failed.</p>"
 
-          article_page = f"""<!doctype html>
-          <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>{html.escape(title)}</title>
-            <meta name="description" content="{html.escape(description)}">
-          </head>
-          <body>
-            <p><a href="../index.html">Home</a></p>
-            <h1>{html.escape(title)}</h1>
-            <p><em>Published {date_str}</em></p>
-            {article_html}
-          </body>
-          </html>"""
+slug = f"{date_str}-" + re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60]
 
-          Path(f"site/posts/{slug}.html").write_text(article_page, encoding="utf-8")
+article_page = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{html.escape(title)}</title>
+  <meta name="description" content="{html.escape(description)}">
+</head>
+<body>
+  <p><a href="../index.html">Home</a></p>
+  <h1>{html.escape(title)}</h1>
+  <p><em>Published {date_str}</em></p>
+  {article_html}
+</body>
+</html>"""
 
-          posts = []
-          posts_dir = Path("site/posts")
-          for p in sorted(posts_dir.glob("*.html"), reverse=True):
-              name = p.stem
-              pretty = name.replace("-", " ")
-              posts.append((p.name, pretty))
+Path(f"site/posts/{slug}.html").write_text(article_page, encoding="utf-8")
 
-          latest_link = f"posts/{slug}.html"
+posts = []
+posts_dir = Path("site/posts")
+for p in sorted(posts_dir.glob("*.html"), reverse=True):
+    posts.append((p.name, p.stem.replace("-", " ").title()))
 
-          post_links = "\n".join(
-              f'<li><a href="posts/{filename}">{html.escape(label.title())}</a></li>'
-              for filename, label in posts[:30]
-          )
+latest_link = f"posts/{slug}.html"
 
-          homepage = f"""<!doctype html>
-          <html lang="en">
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>{html.escape(site_name)}</title>
-            <meta name="description" content="Budget-friendly remote work and home office guides.">
-          </head>
-          <body>
-            <h1>{html.escape(site_name)}</h1>
-            <p>AI-generated guides for affordable remote work tools and home office setups.</p>
+post_links = "\n".join(
+    f'<li><a href="posts/{filename}">{html.escape(label)}</a></li>'
+    for filename, label in posts[:30]
+)
 
-            <h2>Latest guide</h2>
-            <p><a href="{latest_link}">{html.escape(title)}</a></p>
-            <p>{html.escape(description)}</p>
+homepage = f"""<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{html.escape(site_name)}</title>
+  <meta name="description" content="Budget-friendly remote work and home office guides.">
+</head>
+<body>
+  <h1>{html.escape(site_name)}</h1>
+  <p>AI-generated guides for affordable remote work tools and home office setups.</p>
 
-            <h2>All guides</h2>
-            <ul>
-              {post_links}
-            </ul>
-          </body>
-          </html>"""
+  <h2>Latest guide</h2>
+  <p><a href="{latest_link}">{html.escape(title)}</a></p>
+  <p>{html.escape(description)}</p>
 
-          Path("site/index.html").write_text(homepage, encoding="utf-8")
-          PY
+  <h2>All guides</h2>
+  <ul>
+    {post_links}
+  </ul>
+</body>
+</html>"""
+
+Path("site/index.html").write_text(homepage, encoding="utf-8")
+PY
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
