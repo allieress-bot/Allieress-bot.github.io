@@ -2,16 +2,8 @@ name: Build and deploy autonomous site
 
 on:
   workflow_dispatch:
-  push:
-
-      - uses: actions/upload-pages-artifact@v4
-      - name: Save generated pages to repo
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add site
-          git diff --cached --quiet || git commit -m "Update generated site content"
-          git push
+  schedule:
+    - cron: "17 13 * * *"
 
 permissions:
   contents: write
@@ -33,12 +25,21 @@ jobs:
 
       - run: pip install google-genai
 
-      - name: Generate AI homepage
+      - name: Generate article and homepage
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           mkdir -p site
-          python -c "from google import genai; from pathlib import Path; import html, datetime, re; c=genai.Client(); r=c.models.generate_content(model='gemini-2.5-flash', contents='Write a helpful beginner guide about a specific budget home office setup. Include a clear title and practical tips.'); text=r.text; title=text.split('\n')[0][:80]; slug=re.sub(r'[^a-z0-9]+','-',title.lower()).strip('-')[:50]; date=datetime.datetime.utcnow().strftime('%Y-%m-%d'); fname=f'{date}-{slug}.html'; Path('site').mkdir(exist_ok=True); Path(f'site/{fname}').write_text('<h1>'+html.escape(title)+'</h1><pre>'+html.escape(text)+'</pre>'); files=sorted([f.name for f in Path('site').glob('*.html') if f.name!='index.html'], reverse=True); links=''.join([f'<li><a href=\"{f}\">{f}</a></li>' for f in files[:20]]); Path('site/index.html').write_text('<!doctype html><html><body><h1>Remote Work Tool Guide</h1><ul>'+links+'</ul></body></html>')"
+          python -c "from google import genai; from pathlib import Path; import html, datetime, re; c=genai.Client(); r=c.models.generate_content(model='gemini-2.5-flash', contents='Write a helpful beginner guide about a specific budget home office setup. Start with a short clear title on the first line, then provide practical tips in plain text.'); text=r.text.strip(); lines=[line.strip() for line in text.splitlines() if line.strip()]; title=(lines[0] if lines else 'Budget Home Office Setup Guide')[:80]; slug=re.sub(r'[^a-z0-9]+','-',title.lower()).strip('-')[:50] or 'guide'; date=datetime.datetime.utcnow().strftime('%Y-%m-%d'); fname=f'{date}-{slug}.html'; Path('site').mkdir(exist_ok=True); Path(f'site/{fname}').write_text('<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>'+html.escape(title)+'</title></head><body><p><a href=\"index.html\">Home</a></p><h1>'+html.escape(title)+'</h1><pre style=\"white-space:pre-wrap;font:inherit\">'+html.escape(text)+'</pre></body></html>', encoding='utf-8'); files=sorted([f.name for f in Path('site').glob('*.html') if f.name!='index.html'], reverse=True); links=''.join([f'<li><a href=\"{f}\">{html.escape(f[:-5].replace(\"-\",\" \").title())}</a></li>' for f in files[:20]]); Path('site/index.html').write_text('<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Remote Work Tool Guide</title></head><body><h1>Remote Work Tool Guide</h1><p>AI-generated guides about budget-friendly remote work tools and setups.</p><ul>'+links+'</ul></body></html>', encoding='utf-8')"
+
+      - name: Save generated pages to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site
+          git diff --cached --quiet || git commit -m "Update generated site content"
+          git push
+
       - uses: actions/upload-pages-artifact@v4
         with:
           path: ./site
