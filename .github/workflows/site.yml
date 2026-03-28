@@ -2,12 +2,11 @@ name: Build and deploy autonomous site
 
 on:
   workflow_dispatch:
-  push:
   schedule:
     - cron: "17 13 * * *"
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
@@ -16,151 +15,53 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v5
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install dependencies
-        run: pip install -q -U google-genai
+      - run: pip install google-genai
 
-      - name: Generate article and site
+      - name: Generate site
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          SITE_NAME: "Remote Work Tool Guide"
-          NICHE: "budget-friendly productivity and home office tools for remote workers"
         run: |
-          mkdir -p site/posts
+          mkdir -p site
           python <<'PY'
-import os
-import re
-import html
-from pathlib import Path
-from datetime import datetime, timezone
 from google import genai
-
-site_name = os.environ["SITE_NAME"]
-niche = os.environ["NICHE"]
-
-now = datetime.now(timezone.utc)
-date_str = now.strftime("%Y-%m-%d")
+from pathlib import Path
 
 client = genai.Client()
 
-prompt = f"""
-You write practical content for a niche site.
-
-Niche: {niche}
-
-Return plain text in exactly this format:
-
-TITLE: <specific SEO-friendly title>
-DESCRIPTION: <1 sentence meta description>
-ARTICLE:
-<HTML using only h2, h3, p, ul, ol, li, strong, em>
-
-Requirements:
-- 700 to 1100 words
-- beginner-friendly
-- practical, specific, non-hype
-- no fake testing, no invented prices, no personal experience
-- include one section titled "Best for tight budgets"
-- include one section titled "What to avoid"
-- choose a very specific long-tail topic within the niche
-"""
-
 response = client.models.generate_content(
     model="gemini-2.5-flash",
-    contents=prompt,
+    contents="Write a helpful short guide about budget home office setups."
 )
 
-text = response.text.strip()
-
-title_match = re.search(r"TITLE:\s*(.+)", text)
-desc_match = re.search(r"DESCRIPTION:\s*(.+)", text)
-article_match = re.search(r"ARTICLE:\s*(.*)", text, re.S)
-
-title = title_match.group(1).strip() if title_match else "Daily Remote Work Guide"
-description = desc_match.group(1).strip() if desc_match else "Practical buying advice for remote workers."
-article_html = article_match.group(1).strip() if article_match else "<p>Article generation failed.</p>"
-
-slug = f"{date_str}-" + re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60]
-
-article_page = f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{html.escape(title)}</title>
-  <meta name="description" content="{html.escape(description)}">
-</head>
+html = f"""
+<html>
+<head><title>Remote Work Tool Guide</title></head>
 <body>
-  <p><a href="../index.html">Home</a></p>
-  <h1>{html.escape(title)}</h1>
-  <p><em>Published {date_str}</em></p>
-  {article_html}
+<h1>Remote Work Tool Guide</h1>
+<p>{response.text}</p>
 </body>
-</html>"""
+</html>
+"""
 
-Path(f"site/posts/{slug}.html").write_text(article_page, encoding="utf-8")
-
-posts = []
-posts_dir = Path("site/posts")
-for p in sorted(posts_dir.glob("*.html"), reverse=True):
-    posts.append((p.name, p.stem.replace("-", " ").title()))
-
-latest_link = f"posts/{slug}.html"
-
-post_links = "\n".join(
-    f'<li><a href="posts/{filename}">{html.escape(label)}</a></li>'
-    for filename, label in posts[:30]
-)
-
-homepage = f"""<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{html.escape(site_name)}</title>
-  <meta name="description" content="Budget-friendly remote work and home office guides.">
-</head>
-<body>
-  <h1>{html.escape(site_name)}</h1>
-  <p>AI-generated guides for affordable remote work tools and home office setups.</p>
-
-  <h2>Latest guide</h2>
-  <p><a href="{latest_link}">{html.escape(title)}</a></p>
-  <p>{html.escape(description)}</p>
-
-  <h2>All guides</h2>
-  <ul>
-    {post_links}
-  </ul>
-</body>
-</html>"""
-
-Path("site/index.html").write_text(homepage, encoding="utf-8")
+Path("site/index.html").write_text(html)
 PY
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v4
+      - uses: actions/upload-pages-artifact@v4
         with:
           path: ./site
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
- 
+
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
+      - id: deployment
         uses: actions/deploy-pages@v4
