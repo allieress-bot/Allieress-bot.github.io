@@ -54,14 +54,14 @@ jobs:
 
           client = genai.Client()
 
-          prompt = f"""
+                    prompt = f"""
           You write practical content for a niche site.
 
           Niche: {niche}
 
           Return plain text in exactly this format:
 
-          TITLE: <title>
+          TITLE: <specific SEO-friendly title>
           DESCRIPTION: <1 sentence meta description>
           ARTICLE:
           <HTML using only h2, h3, p, ul, ol, li, strong, em>
@@ -73,6 +73,8 @@ jobs:
           - no fake testing, no invented prices, no personal experience
           - include one section titled "Best for tight budgets"
           - include one section titled "What to avoid"
+          - choose a very specific long-tail topic within the niche
+          - do not repeat the same angle as a generic homepage
           """
 
           response = client.models.generate_content(
