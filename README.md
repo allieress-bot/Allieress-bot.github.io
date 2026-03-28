@@ -1,2 +1,2 @@
-# Allieress-bot.github.io
+# allieress-bot.github.io
 Content test
