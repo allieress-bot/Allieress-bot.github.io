@@ -4,6 +4,15 @@ on:
   workflow_dispatch:
   push:
 
+      - uses: actions/upload-pages-artifact@v4
+      - name: Save generated pages to repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add site
+          git diff --cached --quiet || git commit -m "Update generated site content"
+          git push
+
 permissions:
   contents: write
   pages: write
