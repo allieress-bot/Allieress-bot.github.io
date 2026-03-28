@@ -50,7 +50,7 @@ jobs:
 
           now = datetime.now(timezone.utc)
           date_str = now.strftime("%Y-%m-%d")
-          slug = f"{date_str}-guide"
+          slug = f"{date_str}-" + re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60]
 
           client = genai.Client()
 
