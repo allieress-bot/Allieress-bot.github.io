@@ -29,7 +29,7 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           mkdir -p site
-          python -c "from google import genai; from pathlib import Path; import html, datetime; c=genai.Client(); r=c.models.generate_content(model='gemini-2.5-flash', contents='Write a helpful beginner guide about a specific budget home office setup. Include a title and practical tips.'); t=r.text; now=datetime.datetime.utcnow().strftime('%Y-%m-%d'); Path('site/article.html').write_text('<h1>Latest Guide</h1><pre>'+html.escape(t)+'</pre>'); Path('site/index.html').write_text('<!doctype html><html><body><h1>Remote Work Tool Guide</h1><p><a href=\"article.html\">Read latest guide</a></p></body></html>')"
+          python -c "from google import genai; from pathlib import Path; import html, datetime, re; c=genai.Client(); r=c.models.generate_content(model='gemini-2.5-flash', contents='Write a helpful beginner guide about a specific budget home office setup. Include a clear title and practical tips.'); text=r.text; title=text.split('\n')[0][:80]; slug=re.sub(r'[^a-z0-9]+','-',title.lower()).strip('-')[:50]; date=datetime.datetime.utcnow().strftime('%Y-%m-%d'); fname=f'{date}-{slug}.html'; Path('site').mkdir(exist_ok=True); Path(f'site/{fname}').write_text('<h1>'+html.escape(title)+'</h1><pre>'+html.escape(text)+'</pre>'); files=sorted([f.name for f in Path('site').glob('*.html') if f.name!='index.html'], reverse=True); links=''.join([f'<li><a href=\"{f}\">{f}</a></li>' for f in files[:20]]); Path('site/index.html').write_text('<!doctype html><html><body><h1>Remote Work Tool Guide</h1><ul>'+links+'</ul></body></html>')"
       - uses: actions/upload-pages-artifact@v4
         with:
           path: ./site
