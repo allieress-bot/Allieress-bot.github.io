@@ -7,7 +7,7 @@ on:
     - cron: "17 13 * * *"
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -30,90 +30,122 @@ jobs:
       - name: Install dependencies
         run: pip install -q -U google-genai
 
-      - name: Generate site with Gemini
+      - name: Generate article and site
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           SITE_NAME: "Remote Work Tool Guide"
           NICHE: "budget-friendly productivity and home office tools for remote workers"
         run: |
-          mkdir -p site
+          mkdir -p site/posts
           python <<'PY'
           import os
+          import re
           import html
-          from google import genai
           from pathlib import Path
+          from datetime import datetime, timezone
+          from google import genai
 
           site_name = os.environ["SITE_NAME"]
           niche = os.environ["NICHE"]
 
+          now = datetime.now(timezone.utc)
+          date_str = now.strftime("%Y-%m-%d")
+          slug = f"{date_str}-guide"
+
           client = genai.Client()
 
           prompt = f"""
-          Write a short homepage for a niche website.
+          You write practical content for a niche site.
 
-          Site name: {site_name}
           Niche: {niche}
 
           Return plain text in exactly this format:
 
           TITLE: <title>
-          INTRO: <2 sentence intro>
-          BULLETS:
-          - <bullet 1>
-          - <bullet 2>
-          - <bullet 3>
+          DESCRIPTION: <1 sentence meta description>
+          ARTICLE:
+          <HTML using only h2, h3, p, ul, ol, li, strong, em>
+
+          Requirements:
+          - 700 to 1100 words
+          - beginner-friendly
+          - practical, specific, non-hype
+          - no fake testing, no invented prices, no personal experience
+          - include one section titled "Best for tight budgets"
+          - include one section titled "What to avoid"
           """
 
           response = client.models.generate_content(
-              model="gemini-3-flash-preview",
+              model="gemini-3-flash",
               contents=prompt,
           )
 
-          text = response.text.strip().splitlines()
+          text = response.text.strip()
 
-          title = site_name
-          intro = "Practical recommendations for remote workers."
-          bullets = []
+          title_match = re.search(r"TITLE:\s*(.+)", text)
+          desc_match = re.search(r"DESCRIPTION:\s*(.+)", text)
+          article_match = re.search(r"ARTICLE:\s*(.*)", text, re.S)
 
-          mode = None
-          for line in text:
-              if line.startswith("TITLE:"):
-                  title = line.replace("TITLE:", "", 1).strip() or site_name
-              elif line.startswith("INTRO:"):
-                  intro = line.replace("INTRO:", "", 1).strip() or intro
-              elif line.startswith("BULLETS:"):
-                  mode = "bullets"
-              elif mode == "bullets" and line.strip().startswith("- "):
-                  bullets.append(line.strip()[2:])
+          title = title_match.group(1).strip() if title_match else "Daily Remote Work Guide"
+          description = desc_match.group(1).strip() if desc_match else "Practical buying advice for remote workers."
+          article_html = article_match.group(1).strip() if article_match else "<p>Article generation failed.</p>"
 
-          if len(bullets) < 3:
-              bullets = [
-                  "Budget-friendly home office picks",
-                  "Simple productivity setup tips",
-                  "Beginner-friendly buying guides",
-              ]
-
-          bullets_html = "".join(f"<li>{html.escape(item)}</li>" for item in bullets[:3])
-
-          page = f"""<!doctype html>
+          article_page = f"""<!doctype html>
           <html lang="en">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <title>{html.escape(title)}</title>
-            <meta name="description" content="{html.escape(intro)}">
+            <meta name="description" content="{html.escape(description)}">
           </head>
           <body>
+            <p><a href="../index.html">Home</a></p>
             <h1>{html.escape(title)}</h1>
-            <p>{html.escape(intro)}</p>
-            <h2>What you'll find here</h2>
+            <p><em>Published {date_str}</em></p>
+            {article_html}
+          </body>
+          </html>"""
+
+          Path(f"site/posts/{slug}.html").write_text(article_page, encoding="utf-8")
+
+          posts = []
+          posts_dir = Path("site/posts")
+          for p in sorted(posts_dir.glob("*.html"), reverse=True):
+              name = p.stem
+              pretty = name.replace("-", " ")
+              posts.append((p.name, pretty))
+
+          latest_link = f"posts/{slug}.html"
+
+          post_links = "\n".join(
+              f'<li><a href="posts/{filename}">{html.escape(label.title())}</a></li>'
+              for filename, label in posts[:30]
+          )
+
+          homepage = f"""<!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>{html.escape(site_name)}</title>
+            <meta name="description" content="Budget-friendly remote work and home office guides.">
+          </head>
+          <body>
+            <h1>{html.escape(site_name)}</h1>
+            <p>AI-generated guides for affordable remote work tools and home office setups.</p>
+
+            <h2>Latest guide</h2>
+            <p><a href="{latest_link}">{html.escape(title)}</a></p>
+            <p>{html.escape(description)}</p>
+
+            <h2>All guides</h2>
             <ul>
-              {bullets_html}
+              {post_links}
             </ul>
           </body>
           </html>"""
 
-          Path("site/index.html").write_text(page, encoding="utf-8")
+          Path("site/index.html").write_text(homepage, encoding="utf-8")
           PY
 
       - name: Upload Pages artifact
