@@ -3,6 +3,8 @@ name: Build and deploy autonomous site
 on:
   workflow_dispatch:
   push:
+  schedule:
+    - cron: "17 13 * * *"
 
 permissions:
   contents: read
