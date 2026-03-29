@@ -46,8 +46,17 @@ jobs:
           response = client.models.generate_content(
               model="gemini-2.5-flash",
               contents=(
-                  "Write a helpful beginner guide about a specific budget home office setup. "
-                  "Put a short clear title on the first line, then practical plain-text advice."
+                  "Write a highly specific beginner guide targeting a real search query about budget home office or remote work setups. "
+                  "Focus on ONE narrow, practical topic with clear buying or setup intent. "
+                  "Examples include: best cheap desk setup for small spaces, budget dual monitor setup under $200, how to build a home office for under $100, cheap ergonomic chair alternatives that actually work. "
+                  "Start with a clear, SEO-friendly title on the first line with no quotes. "
+                  "Then write practical, step-by-step advice in plain text. "
+                  "Be specific and actionable, not generic. Include concrete recommendations and setup steps. "
+                  "Focus on solving one clear problem. Avoid fluff or vague introductions. "
+                  "Do not mention AI or that this is generated. "
+                  "Keep it beginner-friendly but genuinely useful. "
+                  "Aim for 600 to 1000 words. "
+                  "Output format: first line is the title, the rest is the content."
               ),
           )
 
