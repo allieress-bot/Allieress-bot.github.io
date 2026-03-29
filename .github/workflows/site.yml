@@ -148,7 +148,7 @@ jobs:
           """
           (site / "about.html").write_text(about_html, encoding="utf-8")
 
-          base = "https://allieress-bot.github.io"
+          base = "https://deskflowhq.github.io"
           urls = ["index.html", "about.html"] + files
 
           sitemap_entries = "\n".join(
