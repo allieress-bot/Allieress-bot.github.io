@@ -22,9 +22,14 @@ jobs:
         with:
           python-version: "3.11"
 
-      - run: |
+      - run: pip install google-genai
+
+      - name: Generate AI homepage
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
           mkdir -p site
-          echo "<h1>Site reset working</h1>" > site/index.html
+          python -c "from google import genai; from pathlib import Path; import html; c=genai.Client(); r=c.models.generate_content(model='gemini-2.5-flash', contents='Write a short homepage intro and 3 bullet ideas for a website about budget-friendly remote work tools. Keep it practical and beginner-friendly.'); t=html.escape(r.text); Path('site/index.html').write_text('<!doctype html><html><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Remote Work Tool Guide</title></head><body><h1>Remote Work Tool Guide</h1><pre style=\"white-space:pre-wrap;font:inherit\">'+t+'</pre></body></html>', encoding='utf-8')"
 
       - uses: actions/upload-pages-artifact@v4
         with:
