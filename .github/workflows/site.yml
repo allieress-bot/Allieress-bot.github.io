@@ -43,130 +43,124 @@ jobs:
         run: |
           mkdir -p site
           python <<'PY'
-          from google import genai
-          from pathlib import Path
-          import html
-          import datetime
-          import re
+from google import genai
+from pathlib import Path
+import html
+import datetime
+import re
 
-          client = genai.Client()
+client = genai.Client()
 
-          response = client.models.generate_content(
-              model="gemini-2.5-flash",
-              contents=(
-                  "Write a highly specific beginner guide targeting a real search query about budget home office or remote work setups. "
-                  "Focus on ONE narrow, practical topic with clear buying or setup intent. "
-                  "Examples include: best cheap desk setup for small spaces, budget dual monitor setup under $200, how to build a home office for under $100, cheap ergonomic chair alternatives that actually work. "
-                  "Start with a clear, SEO-friendly title on the first line with no quotes. "
-                  "Then write practical, step-by-step advice in plain text. "
-                  "Be specific and actionable, not generic. Include concrete recommendations and setup steps. "
-                  "Focus on solving one clear problem. Avoid fluff or vague introductions. "
-                  "Do not mention AI or that this is generated. "
-                  "Keep it beginner-friendly but genuinely useful. "
-                  "Aim for 600 to 1000 words. "
-                  "Output format: first line is the title, the rest is the content."
-              ),
-          )
+response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents=(
+        "Write a highly specific beginner guide targeting a real search query about budget home office or remote work setups. "
+        "Focus on ONE narrow, practical topic with clear buying or setup intent. "
+        "Examples include: best cheap desk setup for small spaces, budget dual monitor setup under $200, how to build a home office for under $100. "
+        "Start with a clear SEO-friendly title on the first line. "
+        "Then write practical, step-by-step advice. "
+        "Be specific, actionable, and avoid fluff. "
+        "Output format: first line is the title, rest is content."
+    ),
+)
 
-          text = response.text.strip()
-          lines = [line.strip() for line in text.splitlines() if line.strip()]
-          title = (lines[0] if lines else "Budget Home Office Setup Guide")[:80]
+text = response.text.strip()
+lines = [line.strip() for line in text.splitlines() if line.strip()]
+title = (lines[0] if lines else "Budget Home Office Setup Guide")[:80]
 
-          slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:50]
-          if not slug:
-              slug = "guide"
+slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:50] or "guide"
+date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
+fname = f"{date}-{slug}.html"
 
-          date = datetime.datetime.utcnow().strftime("%Y-%m-%d")
-          fname = f"{date}-{slug}.html"
+site = Path("site")
+site.mkdir(exist_ok=True)
 
-          site = Path("site")
-          site.mkdir(exist_ok=True)
+# Article page
+(site / fname).write_text(
+    f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{html.escape(title)}</title>
+</head>
+<body>
+  <p><a href="index.html">Home</a></p>
+  <h1>{html.escape(title)}</h1>
+  <pre style="white-space:pre-wrap;font:inherit">{html.escape(text)}</pre>
+</body>
+</html>
+""",
+    encoding="utf-8",
+)
 
-          article_html = f"""<!doctype html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>{html.escape(title)}</title>
-            <meta name="description" content="AI-generated guide about budget-friendly remote work setups.">
-          </head>
-          <body>
-            <p><a href="index.html">Home</a></p>
-            <h1>{html.escape(title)}</h1>
-            <pre style="white-space: pre-wrap; font: inherit;">{html.escape(text)}</pre>
-          </body>
-          </html>
-          """
-          (site / fname).write_text(article_html, encoding="utf-8")
+# Collect pages
+files = sorted(
+    [f.name for f in site.glob("*.html") if f.name not in ["index.html", "about.html"]],
+    reverse=True,
+)
 
-          files = sorted(
-              [
-                  f.name
-                  for f in site.glob("*.html")
-                  if f.name not in ["index.html", "about.html"]
-              ],
-              reverse=True,
-          )
+links = "".join(
+    f'<li><a href="{f}">{html.escape(f[:-5].replace("-", " ").title())}</a></li>'
+    for f in files[:50]
+)
 
-          links = "".join(
-              f'<li><a href="{name}">{html.escape(name[:-5].replace("-", " ").title())}</a></li>'
-              for name in files[:50]
-          )
+# Homepage
+(site / "index.html").write_text(
+    f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Remote Work Tool Guide</title>
+</head>
+<body>
+  <h1>Remote Work Tool Guide</h1>
+  <p><a href="about.html">About</a></p>
+  <ul>{links}</ul>
+</body>
+</html>
+""",
+    encoding="utf-8",
+)
 
-          index_html = f"""<!doctype html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>Remote Work Tool Guide</title>
-            <meta name="description" content="AI-generated guides about budget-friendly remote work tools and setups.">
-          </head>
-          <body>
-            <h1>Remote Work Tool Guide</h1>
-            <p>AI-generated guides about budget-friendly remote work tools and setups.</p>
-            <p><a href="about.html">About</a></p>
-            <ul>{links}</ul>
-          </body>
-          </html>
-          """
-          (site / "index.html").write_text(index_html, encoding="utf-8")
+# About page
+(site / "about.html").write_text(
+    """<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>About</title></head>
+<body>
+  <p><a href="index.html">Home</a></p>
+  <h1>About</h1>
+  <p>This site publishes AI-generated guides about budget-friendly setups.</p>
+</body>
+</html>
+""",
+    encoding="utf-8",
+)
 
-          about_html = """<!doctype html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>About</title>
-          </head>
-          <body>
-            <p><a href="index.html">Home</a></p>
-            <h1>About</h1>
-            <p>This site publishes AI-generated guides focused on affordable remote work tools and home office setups.</p>
-            <p>Content may be imperfect or outdated.</p>
-          </body>
-          </html>
-          """
-          (site / "about.html").write_text(about_html, encoding="utf-8")
+# CLEAN sitemap (fixed)
+base = "https://deskflowhq.github.io"
+urls = ["index.html", "about.html"] + files
 
-          base = "https://deskflowhq.github.io"
-          urls = ["index.html", "about.html"] + files
+sitemap_xml = '<?xml version="1.0" encoding="UTF-8"?>\n'
+sitemap_xml += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
 
-          sitemap_entries = "\n".join(
-              f"  <url><loc>{base}/{u}</loc></url>" for u in urls
-          )
-          sitemap_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
-          <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-          {sitemap_entries}
-          </urlset>
-          """
-          (site / "sitemap.xml").write_text(sitemap_xml, encoding="utf-8")
+for u in urls:
+    sitemap_xml += f'  <url>\n    <loc>{base}/{u}</loc>\n  </url>\n'
 
-          robots_txt = f"""User-agent: *
-          Allow: /
-          Sitemap: {base}/sitemap.xml
-          """
-          (site / "robots.txt").write_text(robots_txt, encoding="utf-8")
-          PY
+sitemap_xml += '</urlset>'
+
+(site / "sitemap.xml").write_text(sitemap_xml, encoding="utf-8")
+
+# Robots
+(site / "robots.txt").write_text(
+    f"""User-agent: *
+Allow: /
+Sitemap: {base}/sitemap.xml
+""",
+    encoding="utf-8",
+)
+PY
 
       - name: Save generated pages to repo
         run: |
@@ -187,5 +181,4 @@ jobs:
 
     steps:
       - name: Deploy to Pages
-        id: deployment
         uses: actions/deploy-pages@v4
